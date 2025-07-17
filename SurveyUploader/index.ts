@@ -139,46 +139,81 @@ export class SurveyUploader
       console.log("Available sheets:", workbook.SheetNames);
       console.log("Workbook:", workbook);
 
-      // Find the first visible sheet (ignore hidden sheets)
-      let targetSheetName = workbook.SheetNames[0];
+      // Find all visible sheets (ignore VeryHidden sheets)
+      const visibleSheets: string[] = [];
 
-      // Look for a visible sheet if there are multiple
       for (const sheetName of workbook.SheetNames) {
-        // Check if sheet is hidden in the workbook props
+        // Check if sheet is VeryHidden in the workbook props
         const sheetIndex = workbook.SheetNames.indexOf(sheetName);
-        const isHidden =
-          workbook.Workbook?.Sheets?.[sheetIndex]?.Hidden !== undefined;
+        const isVeryHidden =
+          workbook.Workbook?.Sheets?.[sheetIndex]?.Hidden === 2;
 
-        if (!isHidden) {
-          targetSheetName = sheetName;
-          break;
+        if (!isVeryHidden) {
+          visibleSheets.push(sheetName);
         }
       }
 
-      console.log("Using sheet:", targetSheetName);
-      const worksheet = workbook.Sheets[targetSheetName];
+      console.log("Processing sheets:", visibleSheets);
 
-      // Log sheet properties
-      console.log(
-        "Sheet properties:",
-        Object.keys(worksheet).filter((key) => key.startsWith("!"))
-      );
+      // Process all visible sheets
+      this._parsedData = [];
+      const totalSheets = visibleSheets.length;
 
-      // Convert to JSON with proper options
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-        header: 1,
-        defval: "",
-        blankrows: false,
-        raw: false, // This ensures values are converted to strings
-      });
+      for (
+        let sheetIndex = 0;
+        sheetIndex < visibleSheets.length;
+        sheetIndex++
+      ) {
+        const sheetName = visibleSheets[sheetIndex];
+        console.log(
+          `Processing sheet ${sheetIndex + 1}/${totalSheets}: ${sheetName}`
+        );
 
-      console.log("Excel sheet data (first 10 rows):", jsonData.slice(0, 10));
-      console.log("Total rows in Excel:", jsonData.length);
+        this.updateModalStatus(
+          `Processing sheet ${sheetIndex + 1}/${totalSheets}: ${sheetName}`,
+          "info"
+        );
 
-      this.updateModalProgress(30);
+        const worksheet = workbook.Sheets[sheetName];
 
-      // Parse the data
-      this._parsedData = this.parseExcelData(jsonData);
+        // Log sheet properties
+        console.log(
+          "Sheet properties:",
+          Object.keys(worksheet).filter((key) => key.startsWith("!"))
+        );
+
+        // Convert to JSON with proper options
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          defval: "",
+          blankrows: false,
+          raw: false, // This ensures values are converted to strings
+        });
+
+        console.log(
+          `Sheet ${sheetName} data (first 10 rows):`,
+          jsonData.slice(0, 10)
+        );
+        console.log(`Total rows in sheet ${sheetName}:`, jsonData.length);
+
+        // Parse the data from this sheet
+        try {
+          const sheetData = this.parseExcelData(jsonData);
+          console.log(
+            `Found ${sheetData.length} records in sheet ${sheetName}`
+          );
+
+          // Add sheet data to the main array
+          this._parsedData.push(...sheetData);
+        } catch (sheetError) {
+          console.log(`Skipping sheet ${sheetName}: ${sheetError}`);
+          // Continue processing other sheets
+        }
+
+        // Update progress for sheet processing
+        const sheetProgress = Math.round(((sheetIndex + 1) / totalSheets) * 30);
+        this.updateModalProgress(sheetProgress);
+      }
 
       if (this._parsedData.length === 0) {
         throw new Error(
@@ -187,13 +222,13 @@ export class SurveyUploader
       }
 
       console.log(
-        "Final parsed data (first 5 records):",
+        `Final parsed data from ${totalSheets} sheets (first 5 records):`,
         this._parsedData.slice(0, 5)
       );
 
       this.updateModalProgress(50);
       this.updateModalStatus(
-        `Found ${this._parsedData.length} records to process. Starting updates...`,
+        `Found ${this._parsedData.length} records from ${totalSheets} sheets. Starting updates...`,
         "info"
       );
 
@@ -211,26 +246,41 @@ export class SurveyUploader
 
     console.log("Raw Excel data:", jsonData);
 
-    if (jsonData.length < 2) {
+    if (jsonData.length < 4) {
       throw new Error(
-        "Excel file must contain at least a header row and one data row"
+        "Excel file must contain at least 3 header rows and one data row"
       );
     }
 
-    // Skip header row (assuming first row contains headers)
-    for (let i = 1; i < jsonData.length; i++) {
+    // Skip header rows (rows 0-2: title, subtitle, empty) - start from headers row to include it
+    for (let i = 3; i < jsonData.length; i++) {
       const row = jsonData[i];
-      console.log(`Row ${i}:`, row);
+      console.log(`Row ${i + 1} (data row ${i - 3}):`, row);
+      console.log(
+        `Row ${i + 1} - isArray: ${Array.isArray(row)}, length: ${
+          row?.length
+        }, first cell: "${row?.[0]}"`
+      );
 
       if (row && Array.isArray(row) && row.length >= 1) {
+        console.log(`Processing row ${i + 1} - passed initial validation`);
+
         // Handle different possible column arrangements
         let id = "";
         let response = "";
         let notes = "";
 
         // Try to find ID (should be in first column)
+        console.log(
+          `Row ${i + 1} - checking ID: row[0] = "${
+            row[0]
+          }", type: ${typeof row[0]}`
+        );
         if (row[0] !== undefined && row[0] !== null && row[0] !== "") {
           id = row[0].toString().trim();
+          console.log(`Row ${i + 1} - ID found: "${id}"`);
+        } else {
+          console.log(`Row ${i + 1} - ID is empty/null/undefined`);
         }
 
         // Response could be in column 2 or 3 (index 1 or 2)
@@ -276,9 +326,21 @@ export class SurveyUploader
             Notes: notes,
           });
           console.log(
-            `Added record: ID=${id}, Response=${response}, Notes=${notes}`
+            `Added record from row ${
+              i + 1
+            }: ID=${id}, Response=${response}, Notes=${notes}`
           );
+        } else {
+          console.log(`Row ${i + 1} SKIPPED - no valid ID found`);
         }
+      } else {
+        console.log(
+          `Row ${
+            i + 1
+          } FAILED initial validation - row: ${row}, isArray: ${Array.isArray(
+            row
+          )}, length: ${row?.length}`
+        );
       }
     }
 
