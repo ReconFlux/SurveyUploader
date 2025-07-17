@@ -51,19 +51,24 @@ export class SurveyUploader
 
   private createUI(): void {
     this._container.innerHTML = `
-            <div class="excel-uploader-container">
-                <div class="upload-section">
-                    <h3>Upload Excel File</h3>
-                    <input type="file" accept=".xlsx,.xls" class="file-input" />
-                    <button class="upload-btn" disabled>Upload & Process</button>
-                </div>
-                
-                <div class="status-section">
-                    <div class="status-message"></div>
+            <button class="upload-survey-btn">Upload Survey</button>
+            
+            <!-- Upload Modal -->
+            <div class="upload-modal-overlay" style="display: none;">
+                <div class="upload-modal-content">
+                    <div class="upload-modal-header">
+                        <h3>Upload Excel File</h3>
+                        <button class="close-upload-modal">×</button>
+                    </div>
+                    <div class="upload-modal-body">
+                        <div class="status-message"></div>
+                        <input type="file" accept=".xlsx,.xls" class="file-input" />
+                        <button class="upload-btn" disabled>Upload & Process</button>
+                    </div>
                 </div>
             </div>
             
-            <!-- Modal -->
+            <!-- Processing Modal -->
             <div class="modal-overlay" style="display: none;">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -98,6 +103,15 @@ export class SurveyUploader
   }
 
   private attachEventListeners(): void {
+    // Upload Survey button - opens upload modal
+    const uploadSurveyBtn = this._container.querySelector(".upload-survey-btn");
+    if (uploadSurveyBtn) {
+      uploadSurveyBtn.addEventListener("click", () => {
+        this.showUploadModal();
+      });
+    }
+
+    // File input change event
     this._fileInput.addEventListener("change", (event) => {
       const file = (event.target as HTMLInputElement).files?.[0];
       this._uploadButton.disabled = !file;
@@ -107,11 +121,31 @@ export class SurveyUploader
       }
     });
 
+    // Upload & Process button
     this._uploadButton.addEventListener("click", () => {
+      this.hideUploadModal();
       this.uploadAndProcessFile();
     });
 
-    // Modal close button
+    // Close upload modal button
+    const closeUploadModalBtn = this._container.querySelector(".close-upload-modal");
+    if (closeUploadModalBtn) {
+      closeUploadModalBtn.addEventListener("click", () => {
+        this.hideUploadModal();
+      });
+    }
+
+    // Close upload modal when clicking outside
+    const uploadModalOverlay = this._container.querySelector(".upload-modal-overlay");
+    if (uploadModalOverlay) {
+      uploadModalOverlay.addEventListener("click", (event) => {
+        if (event.target === uploadModalOverlay) {
+          this.hideUploadModal();
+        }
+      });
+    }
+
+    // Processing modal close button
     const closeBtn = this._container.querySelector(".close-btn");
     if (closeBtn) {
       closeBtn.addEventListener("click", () => {
@@ -428,6 +462,20 @@ export class SurveyUploader
     }
 
     this.displayModalResults(results);
+  }
+
+  private showUploadModal(): void {
+    const modal = this._container.querySelector(
+      ".upload-modal-overlay"
+    ) as HTMLDivElement;
+    modal.style.display = "flex";
+  }
+
+  private hideUploadModal(): void {
+    const modal = this._container.querySelector(
+      ".upload-modal-overlay"
+    ) as HTMLDivElement;
+    modal.style.display = "none";
   }
 
   private showModal(): void {
