@@ -55,26 +55,31 @@ export class SurveyUploader
                 <div class="upload-section">
                     <h3>Upload Excel File</h3>
                     <input type="file" accept=".xlsx,.xls" class="file-input" />
-                    <button class="upload-btn" disabled>Upload & Parse</button>
+                    <button class="upload-btn" disabled>Upload & Process</button>
                 </div>
                 
                 <div class="status-section">
                     <div class="status-message"></div>
-                    <div class="progress-bar" style="display: none;">
-                        <div class="progress-fill"></div>
-                        <span class="progress-text">0%</span>
+                </div>
+            </div>
+            
+            <!-- Modal -->
+            <div class="modal-overlay" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Processing Excel File</h3>
                     </div>
-                </div>
-                
-                <div class="preview-section" style="display: none;">
-                    <h3>Data Preview</h3>
-                    <div class="data-preview"></div>
-                    <button class="process-btn">Update Dataverse Records</button>
-                </div>
-                
-                <div class="results-section" style="display: none;">
-                    <h3>Update Results</h3>
-                    <div class="results-content"></div>
+                    <div class="modal-body">
+                        <div class="modal-status"></div>
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                            <span class="progress-text">0%</span>
+                        </div>
+                        <div class="modal-results" style="display: none;"></div>
+                    </div>
+                    <div class="modal-footer" style="display: none;">
+                        <button class="close-btn">Close & Refresh</button>
+                    </div>
                 </div>
             </div>
         `;
@@ -85,17 +90,8 @@ export class SurveyUploader
     this._uploadButton = this._container.querySelector(
       ".upload-btn"
     ) as HTMLButtonElement;
-    this._processButton = this._container.querySelector(
-      ".process-btn"
-    ) as HTMLButtonElement;
     this._statusDiv = this._container.querySelector(
       ".status-message"
-    ) as HTMLDivElement;
-    this._progressDiv = this._container.querySelector(
-      ".progress-bar"
-    ) as HTMLDivElement;
-    this._resultsDiv = this._container.querySelector(
-      ".results-content"
     ) as HTMLDivElement;
 
     this.attachEventListeners();
@@ -112,56 +108,108 @@ export class SurveyUploader
     });
 
     this._uploadButton.addEventListener("click", () => {
-      this.uploadAndParseFile();
+      this.uploadAndProcessFile();
     });
 
-    this._processButton.addEventListener("click", () => {
-      this.processDataverseUpdates();
-    });
+    // Modal close button
+    const closeBtn = this._container.querySelector(".close-btn");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", () => {
+        location.reload();
+      });
+    }
   }
 
-  private async uploadAndParseFile(): Promise<void> {
+  private async uploadAndProcessFile(): Promise<void> {
     const file = this._fileInput.files?.[0];
     if (!file) {
       this.showStatus("Please select a file first", "error");
       return;
     }
 
-    this.showStatus("Parsing Excel file...", "info");
-    this.showProgress(0);
+    // Show modal
+    this.showModal();
+    this.updateModalStatus("Parsing Excel file...", "info");
+    this.updateModalProgress(0);
 
     try {
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer, { type: "array" });
 
-      // Get the first sheet
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
+      console.log("Available sheets:", workbook.SheetNames);
+      console.log("Workbook:", workbook);
 
-      // Convert to JSON
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      // Find the first visible sheet (ignore hidden sheets)
+      let targetSheetName = workbook.SheetNames[0];
 
-      this.showProgress(50);
+      // Look for a visible sheet if there are multiple
+      for (const sheetName of workbook.SheetNames) {
+        // Check if sheet is hidden in the workbook props
+        const sheetIndex = workbook.SheetNames.indexOf(sheetName);
+        const isHidden =
+          workbook.Workbook?.Sheets?.[sheetIndex]?.Hidden !== undefined;
+
+        if (!isHidden) {
+          targetSheetName = sheetName;
+          break;
+        }
+      }
+
+      console.log("Using sheet:", targetSheetName);
+      const worksheet = workbook.Sheets[targetSheetName];
+
+      // Log sheet properties
+      console.log(
+        "Sheet properties:",
+        Object.keys(worksheet).filter((key) => key.startsWith("!"))
+      );
+
+      // Convert to JSON with proper options
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+        header: 1,
+        defval: "",
+        blankrows: false,
+        raw: false, // This ensures values are converted to strings
+      });
+
+      console.log("Excel sheet data (first 10 rows):", jsonData.slice(0, 10));
+      console.log("Total rows in Excel:", jsonData.length);
+
+      this.updateModalProgress(30);
 
       // Parse the data
       this._parsedData = this.parseExcelData(jsonData);
 
-      this.showProgress(100);
-      this.showStatus(
-        `Successfully parsed ${this._parsedData.length} records`,
-        "success"
+      if (this._parsedData.length === 0) {
+        throw new Error(
+          "No valid data found in Excel file. Please check your file format."
+        );
+      }
+
+      console.log(
+        "Final parsed data (first 5 records):",
+        this._parsedData.slice(0, 5)
       );
 
-      this.displayDataPreview();
-      this.hideProgress();
+      this.updateModalProgress(50);
+      this.updateModalStatus(
+        `Found ${this._parsedData.length} records to process. Starting updates...`,
+        "info"
+      );
+
+      // Process immediately without preview
+      await this.processDataverseUpdates();
     } catch (error) {
-      this.showStatus(`Error parsing file: ${error}`, "error");
-      this.hideProgress();
+      console.error("Error processing file:", error);
+      this.updateModalStatus(`Error: ${error}`, "error");
+      this.showModalFooter();
     }
   }
 
   private parseExcelData(jsonData: any[]): ExcelRow[] {
     const parsedData: ExcelRow[] = [];
+
+    console.log("Raw Excel data:", jsonData);
 
     if (jsonData.length < 2) {
       throw new Error(
@@ -172,16 +220,69 @@ export class SurveyUploader
     // Skip header row (assuming first row contains headers)
     for (let i = 1; i < jsonData.length; i++) {
       const row = jsonData[i];
+      console.log(`Row ${i}:`, row);
 
-      if (row && row.length >= 3) {
-        parsedData.push({
-          ID: row[0]?.toString() || "",
-          Response: row[2]?.toString() || "",
-          Notes: row[3]?.toString() || "",
-        });
+      if (row && Array.isArray(row) && row.length >= 1) {
+        // Handle different possible column arrangements
+        let id = "";
+        let response = "";
+        let notes = "";
+
+        // Try to find ID (should be in first column)
+        if (row[0] !== undefined && row[0] !== null && row[0] !== "") {
+          id = row[0].toString().trim();
+        }
+
+        // Response could be in column 2 or 3 (index 1 or 2)
+        if (
+          row.length > 2 &&
+          row[2] !== undefined &&
+          row[2] !== null &&
+          row[2] !== ""
+        ) {
+          response = row[2].toString().trim();
+        } else if (
+          row.length > 1 &&
+          row[1] !== undefined &&
+          row[1] !== null &&
+          row[1] !== ""
+        ) {
+          response = row[1].toString().trim();
+        }
+
+        // Notes could be in column 3 or 4 (index 2 or 3)
+        if (
+          row.length > 3 &&
+          row[3] !== undefined &&
+          row[3] !== null &&
+          row[3] !== ""
+        ) {
+          notes = row[3].toString().trim();
+        } else if (
+          row.length > 2 &&
+          row[2] !== undefined &&
+          row[2] !== null &&
+          row[2] !== "" &&
+          !response
+        ) {
+          notes = row[2].toString().trim();
+        }
+
+        // Only add if we have at least an ID
+        if (id) {
+          parsedData.push({
+            ID: id,
+            Response: response,
+            Notes: notes,
+          });
+          console.log(
+            `Added record: ID=${id}, Response=${response}, Notes=${notes}`
+          );
+        }
       }
     }
 
+    console.log("Parsed data:", parsedData);
     return parsedData;
   }
 
@@ -232,12 +333,10 @@ export class SurveyUploader
 
   private async processDataverseUpdates(): Promise<void> {
     if (this._parsedData.length === 0) {
-      this.showStatus("No data to process", "error");
+      this.updateModalStatus("No data to process", "error");
+      this.showModalFooter();
       return;
     }
-
-    this.showStatus("Updating Dataverse records...", "info");
-    this.showProgress(0);
 
     const results: UpdateResult[] = [];
     const totalRecords = this._parsedData.length;
@@ -245,13 +344,19 @@ export class SurveyUploader
     for (let i = 0; i < this._parsedData.length; i++) {
       const row = this._parsedData[i];
 
+      this.updateModalStatus(
+        `Processing record ${i + 1} of ${totalRecords}: ${row.ID}`,
+        "info"
+      );
+
       try {
         const result = await this.updateDataverseRecord(row);
         results.push(result);
 
         const progress = Math.round(((i + 1) / totalRecords) * 100);
-        this.showProgress(progress);
+        this.updateModalProgress(progress);
       } catch (error) {
+        console.error(`Error updating record ${row.ID}:`, error);
         results.push({
           success: false,
           recordId: row.ID,
@@ -260,51 +365,238 @@ export class SurveyUploader
       }
     }
 
-    this.hideProgress();
-    this.displayResults(results);
+    this.displayModalResults(results);
+  }
+
+  private showModal(): void {
+    const modal = this._container.querySelector(
+      ".modal-overlay"
+    ) as HTMLDivElement;
+    modal.style.display = "flex";
+  }
+
+  private hideModal(): void {
+    const modal = this._container.querySelector(
+      ".modal-overlay"
+    ) as HTMLDivElement;
+    modal.style.display = "none";
+  }
+
+  private updateModalStatus(
+    message: string,
+    type: "info" | "success" | "error"
+  ): void {
+    const statusDiv = this._container.querySelector(
+      ".modal-status"
+    ) as HTMLDivElement;
+    statusDiv.innerHTML = `<span class="status-${type}">${message}</span>`;
+  }
+
+  private updateModalProgress(percentage: number): void {
+    const progressFill = this._container.querySelector(
+      ".modal-content .progress-fill"
+    ) as HTMLDivElement;
+    const progressText = this._container.querySelector(
+      ".modal-content .progress-text"
+    ) as HTMLSpanElement;
+
+    progressFill.style.width = `${percentage}%`;
+    progressText.textContent = `${percentage}%`;
+  }
+
+  private showModalFooter(): void {
+    const footer = this._container.querySelector(
+      ".modal-footer"
+    ) as HTMLDivElement;
+    footer.style.display = "block";
+  }
+
+  private displayModalResults(results: UpdateResult[]): void {
+    const resultsDiv = this._container.querySelector(
+      ".modal-results"
+    ) as HTMLDivElement;
+
+    const successCount = results.filter((r) => r.success).length;
+    const failureCount = results.filter((r) => !r.success).length;
+
+    let resultsHTML = `
+            <div class="results-summary">
+                <p><strong>Update Complete!</strong></p>
+                <p>✅ Successful: ${successCount}</p>
+                <p>❌ Failed: ${failureCount}</p>
+            </div>
+        `;
+
+    if (failureCount > 0) {
+      resultsHTML += `
+                <div class="failed-records">
+                    <h4>Failed Records:</h4>
+                    <div class="failed-list">
+            `;
+
+      results
+        .filter((r) => !r.success)
+        .forEach((result) => {
+          resultsHTML += `
+                    <div class="failed-item">
+                        <strong>${this.escapeHtml(
+                          result.recordId
+                        )}</strong>: ${this.escapeHtml(
+            result.error || "Unknown error"
+          )}
+                    </div>
+                `;
+        });
+
+      resultsHTML += `
+                    </div>
+                </div>
+            `;
+    }
+
+    resultsDiv.innerHTML = resultsHTML;
+    resultsDiv.style.display = "block";
+
+    if (successCount > 0) {
+      this.updateModalStatus(
+        `Successfully updated ${successCount} records!`,
+        "success"
+      );
+    } else {
+      this.updateModalStatus("No records were updated", "error");
+    }
+
+    this.showModalFooter();
   }
 
   private async updateDataverseRecord(row: ExcelRow): Promise<UpdateResult> {
     try {
-      // First, find the existing record by afsdc_name
-      const query = `?$filter=afsdc_name eq '${row.ID}'`;
-      const retrieveResponse =
-        await this._context.webAPI.retrieveMultipleRecords(
-          "afsdc_questionresponseinstance",
-          query
-        );
+      console.log(`\n=== Processing Record: ${row.ID} ===`);
+      console.log(`Response: "${row.Response}"`);
+      console.log(`Notes: "${row.Notes}"`);
 
-      if (retrieveResponse.entities.length === 0) {
+      // Clean the ID value
+      const cleanId = row.ID.toString().trim();
+
+      // Try different query approaches
+      let retrieveResponse;
+
+      try {
+        // Method 1: Simple filter
+        const query1 = `?$filter=afsdc_name eq '${cleanId}'&$select=afsdc_questionresponseinstanceid,afsdc_name`;
+        console.log(`Trying query 1: ${query1}`);
+        retrieveResponse = await this._context.webAPI.retrieveMultipleRecords(
+          "afsdc_questionresponseinstances",
+          query1
+        );
+        console.log(`Query 1 result:`, retrieveResponse);
+      } catch (error1) {
+        console.log(`Query 1 failed:`, error1);
+
+        try {
+          // Method 2: Try with different entity name
+          const query2 = `?$filter=afsdc_name eq '${cleanId}'&$select=afsdc_questionresponseinstanceid,afsdc_name`;
+          console.log(`Trying query 2 with different entity name: ${query2}`);
+          retrieveResponse = await this._context.webAPI.retrieveMultipleRecords(
+            "afsdc_questionresponseinstance",
+            query2
+          );
+          console.log(`Query 2 result:`, retrieveResponse);
+        } catch (error2) {
+          console.log(`Query 2 failed:`, error2);
+
+          // Method 3: Try without filter to see if entity exists
+          try {
+            const query3 = `?$select=afsdc_questionresponseinstanceid,afsdc_name&$top=5`;
+            console.log(`Trying query 3 to test entity access: ${query3}`);
+            const testResponse =
+              await this._context.webAPI.retrieveMultipleRecords(
+                "afsdc_questionresponseinstances",
+                query3
+              );
+            console.log(
+              `Entity test successful. Sample records:`,
+              testResponse
+            );
+
+            // If we can access the entity, the specific record just doesn't exist
+            return {
+              success: false,
+              recordId: row.ID,
+              error: `Record '${cleanId}' not found in entity`,
+            };
+          } catch (error3) {
+            console.log(`Entity access test failed:`, error3);
+            return {
+              success: false,
+              recordId: row.ID,
+              error: `Entity access error: ${
+                (error3 as any)?.message || "Unknown error"
+              }`,
+            };
+          }
+        }
+      }
+
+      if (!retrieveResponse || retrieveResponse.entities.length === 0) {
+        console.log(`No record found for ID: ${cleanId}`);
         return {
           success: false,
           recordId: row.ID,
-          error: "Record not found",
+          error: `Record not found: '${cleanId}'`,
         };
       }
 
       const existingRecord = retrieveResponse.entities[0];
+      console.log(`Found existing record:`, existingRecord);
 
-      // Update the record
-      const updateData = {
-        afsdc_response: row.Response,
-        afsdc_comments: row.Notes,
-      };
+      // Prepare update data
+      const updateData: any = {};
 
+      if (row.Response && row.Response.toString().trim() !== "") {
+        updateData.afsdc_response = row.Response.toString().trim();
+      }
+
+      if (row.Notes && row.Notes.toString().trim() !== "") {
+        updateData.afsdc_comments = row.Notes.toString().trim();
+      }
+
+      // Only update if we have data to update
+      if (Object.keys(updateData).length === 0) {
+        console.log(`No update data for record: ${cleanId}`);
+        return {
+          success: false,
+          recordId: row.ID,
+          error: "No data to update (Response and Notes are empty)",
+        };
+      }
+
+      console.log(
+        `Updating record ${existingRecord.afsdc_questionresponseinstanceid} with:`,
+        updateData
+      );
+
+      // Try update
       await this._context.webAPI.updateRecord(
         "afsdc_questionresponseinstance",
         existingRecord.afsdc_questionresponseinstanceid,
         updateData
       );
 
+      console.log(`✓ Successfully updated record: ${cleanId}`);
+
       return {
         success: true,
         recordId: row.ID,
       };
     } catch (error) {
+      console.error(`✗ Error updating record ${row.ID}:`, error);
       return {
         success: false,
         recordId: row.ID,
-        error: error?.toString() || "Update failed",
+        error: `Update failed: ${
+          (error as any)?.message || error?.toString() || "Unknown error"
+        }`,
       };
     }
   }
@@ -404,12 +696,12 @@ export class SurveyUploader
 
   public updateView(context: ComponentFramework.Context<IInputs>): void {
     this._context = context;
-    this._value = context.parameters.sampleProperty.raw || "";
+    this._value = context.parameters.value.raw || "";
   }
 
   public getOutputs(): IOutputs {
     return {
-      sampleProperty: this._value,
+      value: this._value,
     };
   }
 
