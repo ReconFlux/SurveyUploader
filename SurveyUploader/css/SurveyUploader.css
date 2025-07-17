@@ -1,0 +1,211 @@
+.excel-uploader-container {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    max-width: 100%;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.upload-section {
+    background: white;
+    padding: 20px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.upload-section h3 {
+    margin-top: 0;
+    color: #323130;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.file-input {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    border: 2px dashed #d1d1d1;
+    border-radius: 4px;
+    background-color: #fafafa;
+    margin-bottom: 15px;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+.file-input:hover {
+    border-color: #0078d4;
+}
+
+.upload-btn, .process-btn {
+    background-color: #0078d4;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background-color 0.3s ease;
+}
+
+.upload-btn:hover, .process-btn:hover {
+    background-color: #106ebe;
+}
+
+.upload-btn:disabled, .process-btn:disabled {
+    background-color: #d1d1d1;
+    cursor: not-allowed;
+}
+
+.status-section {
+    margin-bottom: 20px;
+}
+
+.status-message {
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+.status-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.status-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background-color: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #0078d4;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    font-weight: 600;
+    color: #323130;
+}
+
+.preview-section, .results-section {
+    background: white;
+    padding: 20px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.preview-section h3, .results-section h3 {
+    margin-top: 0;
+    color: #323130;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.data-preview {
+    margin-bottom: 20px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 15px;
+}
+
+.data-table th,
+.data-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #e1e1e1;
+}
+
+.data-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #323130;
+}
+
+.data-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+.results-summary {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.results-summary p {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+.failed-records {
+    border-top: 1px solid #e1e1e1;
+    padding-top: 20px;
+}
+
+.failed-records h4 {
+    color: #721c24;
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.failed-records .data-table {
+    border: 1px solid #f5c6cb;
+}
+
+.failed-records .data-table th {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+@media (max-width: 768px) {
+    .excel-uploader-container {
+        padding: 10px;
+    }
+    
+    .upload-section,
+    .preview-section,
+    .results-section {
+        padding: 15px;
+    }
+    
+    .data-table {
+        font-size: 12px;
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: 8px;
+    }
+}
