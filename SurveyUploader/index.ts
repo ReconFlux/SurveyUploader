@@ -61,7 +61,6 @@ export class SurveyUploader
                         <button class="close-upload-modal">×</button>
                     </div>
                     <div class="upload-modal-body">
-                        <div class="status-message"></div>
                         <input type="file" accept=".xlsx,.xls" class="file-input" />
                         <button class="upload-btn" disabled>Upload & Process</button>
                     </div>
@@ -128,7 +127,9 @@ export class SurveyUploader
     });
 
     // Close upload modal button
-    const closeUploadModalBtn = this._container.querySelector(".close-upload-modal");
+    const closeUploadModalBtn = this._container.querySelector(
+      ".close-upload-modal"
+    );
     if (closeUploadModalBtn) {
       closeUploadModalBtn.addEventListener("click", () => {
         this.hideUploadModal();
@@ -136,7 +137,9 @@ export class SurveyUploader
     }
 
     // Close upload modal when clicking outside
-    const uploadModalOverlay = this._container.querySelector(".upload-modal-overlay");
+    const uploadModalOverlay = this._container.querySelector(
+      ".upload-modal-overlay"
+    );
     if (uploadModalOverlay) {
       uploadModalOverlay.addEventListener("click", (event) => {
         if (event.target === uploadModalOverlay) {
@@ -458,6 +461,7 @@ export class SurveyUploader
           recordId: row.ID,
           error: error?.toString() || "Unknown error",
         });
+        1;
       }
     }
 
