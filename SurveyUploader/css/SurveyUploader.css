@@ -38,7 +38,8 @@
 }
 
 .upload-btn, .process-btn {
-    background-color: #0078d4;
+    background-color: #742774;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: white;
     border: none;
     padding: 12px 24px;
@@ -50,7 +51,7 @@
 }
 
 .upload-btn:hover, .process-btn:hover {
-    background-color: #106ebe;
+    background-color: #923292;
 }
 
 .upload-btn:disabled, .process-btn:disabled {
@@ -192,6 +193,7 @@
 /* Upload Survey Button */
 .upload-survey-btn {
     background-color: #742774;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: white;
     border: none;
     padding: 12px 24px;
