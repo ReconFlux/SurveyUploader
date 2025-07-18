@@ -196,11 +196,10 @@
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: white;
     border: none;
-    padding: 12px 24px;
+    padding: 10px 25px;
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
-    font-weight: 600;
     transition: background-color 0.3s ease;
 }
 
