@@ -189,8 +189,25 @@
     color: #721c24;
 }
 
+/* Upload Survey Button */
+.upload-survey-btn {
+    background-color: #0078d4;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background-color 0.3s ease;
+}
+
+.upload-survey-btn:hover {
+    background-color: #106ebe;
+}
+
 /* Modal styles */
-.modal-overlay {
+.modal-overlay, .upload-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -203,7 +220,7 @@
     z-index: 1000;
 }
 
-.modal-content {
+.modal-content, .upload-modal-content {
     background: white;
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
@@ -213,19 +230,40 @@
     overflow-y: auto;
 }
 
-.modal-header {
+.modal-header, .upload-modal-header {
     padding: 20px;
     border-bottom: 1px solid #e1e1e1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.modal-header h3 {
+.modal-header h3, .upload-modal-header h3 {
     margin: 0;
     color: #323130;
     font-size: 18px;
     font-weight: 600;
 }
 
-.modal-body {
+.close-upload-modal {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-upload-modal:hover {
+    color: #000;
+}
+
+.modal-body, .upload-modal-body {
     padding: 20px;
 }
 

@@ -95,7 +95,7 @@ export class SurveyUploader
       ".upload-btn"
     ) as HTMLButtonElement;
     this._statusDiv = this._container.querySelector(
-      ".status-message"
+      ".modal-status"
     ) as HTMLDivElement;
 
     this.attachEventListeners();
@@ -461,7 +461,6 @@ export class SurveyUploader
           recordId: row.ID,
           error: error?.toString() || "Unknown error",
         });
-        1;
       }
     }
 
