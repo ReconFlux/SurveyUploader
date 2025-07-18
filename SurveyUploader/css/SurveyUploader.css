@@ -191,7 +191,7 @@
 
 /* Upload Survey Button */
 .upload-survey-btn {
-    background-color: #0078d4;
+    background-color: #742774;
     color: white;
     border: none;
     padding: 12px 24px;
@@ -203,7 +203,7 @@
 }
 
 .upload-survey-btn:hover {
-    background-color: #106ebe;
+    background-color: #923292;
 }
 
 /* Modal styles */
