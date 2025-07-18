@@ -28,6 +28,7 @@ export class SurveyUploader
   private _value: string;
   private _parsedData: ExcelRow[] = [];
   private _systemId: string;
+  private _extractedSystemName: string = "";
 
   constructor() {
     this._value = "";
@@ -264,10 +265,34 @@ export class SurveyUploader
       );
 
       this.updateModalProgress(50);
-      this.updateModalStatus(
-        `Found ${this._parsedData.length} records from ${totalSheets} sheets. Starting updates...`,
-        "info"
-      );
+      
+      // Look up system if we have a system name
+      if (this._extractedSystemName) {
+        this.updateModalStatus(
+          `Looking up system: ${this._extractedSystemName}...`,
+          "info"
+        );
+        
+        const systemId = await this.lookupSystemByName(this._extractedSystemName);
+        if (systemId) {
+          this._systemId = systemId;
+          console.log(`Using system ID: ${systemId}`);
+          this.updateModalStatus(
+            `Found system "${this._extractedSystemName}". Processing ${this._parsedData.length} records...`,
+            "info"
+          );
+        } else {
+          this.updateModalStatus(
+            `Warning: System "${this._extractedSystemName}" not found. Using current form context.`,
+            "error"
+          );
+        }
+      } else {
+        this.updateModalStatus(
+          `No system name found in file. Using current form context. Processing ${this._parsedData.length} records...`,
+          "info"
+        );
+      }
 
       // Process immediately without preview
       await this.processDataverseUpdates();
@@ -283,16 +308,19 @@ export class SurveyUploader
 
     console.log("Raw Excel data:", jsonData);
 
-    if (jsonData.length < 4) {
+    if (jsonData.length < 5) {
       throw new Error(
-        "Excel file must contain at least 3 header rows and one data row"
+        "Excel file must contain at least 4 header rows and one data row"
       );
     }
 
-    // Skip header rows (rows 0-2: title, subtitle, empty) - start from headers row to include it
-    for (let i = 3; i < jsonData.length; i++) {
+    // Extract system name from row 3 (index 2)
+    this.extractSystemName(jsonData);
+
+    // Skip header rows (rows 0-3: title, subtitle, system, headers) - start from data rows
+    for (let i = 4; i < jsonData.length; i++) {
       const row = jsonData[i];
-      console.log(`Row ${i + 1} (data row ${i - 3}):`, row);
+      console.log(`Row ${i + 1} (data row ${i - 4}):`, row);
       console.log(
         `Row ${i + 1} - isArray: ${Array.isArray(row)}, length: ${
           row?.length
@@ -365,16 +393,16 @@ export class SurveyUploader
           console.log(
             `Added record from row ${
               i + 1
-            }: ID=${id}, Response=${response}, Notes=${notes}`
+            } (data row ${i - 4}): ID=${id}, Response=${response}, Notes=${notes}`
           );
         } else {
-          console.log(`Row ${i + 1} SKIPPED - no valid ID found`);
+          console.log(`Row ${i + 1} (data row ${i - 4}) SKIPPED - no valid ID found`);
         }
       } else {
         console.log(
           `Row ${
             i + 1
-          } FAILED initial validation - row: ${row}, isArray: ${Array.isArray(
+          } (data row ${i - 4}) FAILED initial validation - row: ${row}, isArray: ${Array.isArray(
             row
           )}, length: ${row?.length}`
         );
@@ -382,7 +410,69 @@ export class SurveyUploader
     }
 
     console.log("Parsed data:", parsedData);
+    console.log("Extracted system name:", this._extractedSystemName);
     return parsedData;
+  }
+
+  private extractSystemName(jsonData: any[]): void {
+    try {
+      // Row 3 is at index 2 (0-based)
+      const systemRow = jsonData[2];
+      console.log("System row (index 2):", systemRow);
+      
+      if (systemRow && Array.isArray(systemRow)) {
+        // Look for system name in the first few columns
+        for (let i = 0; i < Math.min(systemRow.length, 5); i++) {
+          const cellValue = systemRow[i]?.toString().trim();
+          if (cellValue && cellValue.toLowerCase().startsWith('system:')) {
+            // Extract the system name after "System: "
+            this._extractedSystemName = cellValue.substring(7).trim();
+            console.log(`Found system name: "${this._extractedSystemName}"`);
+            return;
+          }
+        }
+      }
+      
+      console.log("No system name found in row 3");
+      this._extractedSystemName = "";
+    } catch (error) {
+      console.error("Error extracting system name:", error);
+      this._extractedSystemName = "";
+    }
+  }
+
+  private async lookupSystemByName(systemName: string): Promise<string | null> {
+    try {
+      console.log(`Looking up system with name: "${systemName}"`);
+      
+      if (!systemName || systemName.trim() === "") {
+        console.log("No system name provided for lookup");
+        return null;
+      }
+      
+      // Query to find system by name
+      const query = `?$filter=afsrapid_name eq '${systemName.trim()}'&$select=afsrapid_systemid,afsrapid_name`;
+      console.log(`System lookup query: ${query}`);
+      
+      const response = await this._context.webAPI.retrieveMultipleRecords(
+        "afsrapid_system",
+        query
+      );
+      
+      console.log(`System lookup response:`, response);
+      
+      if (response && response.entities && response.entities.length > 0) {
+        const systemId = response.entities[0].afsrapid_systemid;
+        console.log(`Found system ID: ${systemId}`);
+        return systemId;
+      } else {
+        console.log(`No system found with name: "${systemName}"`);
+        return null;
+      }
+    } catch (error) {
+      console.error(`Error looking up system "${systemName}":`, error);
+      return null;
+    }
   }
 
   private displayDataPreview(): void {
@@ -593,13 +683,17 @@ export class SurveyUploader
 
       // Try different query approaches
       let retrieveResponse;
+      
+      // Build query with system filter if we have a system ID
+      const systemFilter = this._systemId ? ` and _afsdc_afsrapid_system_value eq '${this._systemId}'` : '';
+      console.log(`Using system filter: ${systemFilter}`);
 
       try {
-        // Method 1: Simple filter
-        const query1 = `?$filter=afsdc_name eq '${cleanId}'&$select=afsdc_questionresponseinstanceid,afsdc_name`;
+        // Method 1: Simple filter with system context
+        const query1 = `?$filter=afsdc_name eq '${cleanId}'${systemFilter}&$select=afsdc_questionresponseinstanceid,afsdc_name,_afsdc_afsrapid_system_value`;
         console.log(`Trying query 1: ${query1}`);
         retrieveResponse = await this._context.webAPI.retrieveMultipleRecords(
-          "afsdc_questionresponseinstances",
+          "afsdc_questionresponseinstance",
           query1
         );
         console.log(`Query 1 result:`, retrieveResponse);
@@ -607,8 +701,8 @@ export class SurveyUploader
         console.log(`Query 1 failed:`, error1);
 
         try {
-          // Method 2: Try with different entity name
-          const query2 = `?$filter=afsdc_name eq '${cleanId}'&$select=afsdc_questionresponseinstanceid,afsdc_name`;
+          // Method 2: Try with different entity name and system filter
+          const query2 = `?$filter=afsdc_name eq '${cleanId}'${systemFilter}&$select=afsdc_questionresponseinstanceid,afsdc_name,_afsdc_afsrapid_system_value`;
           console.log(`Trying query 2 with different entity name: ${query2}`);
           retrieveResponse = await this._context.webAPI.retrieveMultipleRecords(
             "afsdc_questionresponseinstance",
@@ -620,11 +714,11 @@ export class SurveyUploader
 
           // Method 3: Try without filter to see if entity exists
           try {
-            const query3 = `?$select=afsdc_questionresponseinstanceid,afsdc_name&$top=5`;
+            const query3 = `?$select=afsdc_questionresponseinstanceid,afsdc_name,_afsdc_afsrapid_system_value&$top=5`;
             console.log(`Trying query 3 to test entity access: ${query3}`);
             const testResponse =
               await this._context.webAPI.retrieveMultipleRecords(
-                "afsdc_questionresponseinstances",
+                "afsdc_questionresponseinstance",
                 query3
               );
             console.log(
@@ -636,7 +730,7 @@ export class SurveyUploader
             return {
               success: false,
               recordId: row.ID,
-              error: `Record '${cleanId}' not found in entity`,
+              error: `Record '${cleanId}' not found in entity${this._systemId ? ` for system ${this._extractedSystemName}` : ''}`,
             };
           } catch (error3) {
             console.log(`Entity access test failed:`, error3);
