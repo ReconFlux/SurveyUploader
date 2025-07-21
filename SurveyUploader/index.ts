@@ -758,14 +758,16 @@ export class SurveyUploader
       const updateData: any = {};
 
       // Set response field - use empty string if blank to clear existing data
-      updateData.afsdc_response = row.Response && row.Response.toString().trim() !== "" 
-        ? row.Response.toString().trim() 
-        : "";
+      updateData.afsdc_response =
+        row.Response && row.Response.toString().trim() !== ""
+          ? row.Response.toString().trim()
+          : "";
 
       // Set comments field - use empty string if blank to clear existing data
-      updateData.afsdc_comments = row.Notes && row.Notes.toString().trim() !== "" 
-        ? row.Notes.toString().trim() 
-        : "";
+      updateData.afsdc_comments =
+        row.Notes && row.Notes.toString().trim() !== ""
+          ? row.Notes.toString().trim()
+          : "";
 
       console.log(
         `Updating record ${existingRecord.afsdc_questionresponseinstanceid} with:`,
