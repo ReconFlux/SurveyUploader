@@ -350,7 +350,8 @@ export class SurveyUploader
           console.log(`Row ${i + 1} - ID is empty/null/undefined`);
         }
 
-        // Response could be in column 2 or 3 (index 1 or 2)
+        // Response should be in column 2 (index 2) - column 1 contains question text
+        // Do not fall back to other columns as they may contain question text
         if (
           row.length > 2 &&
           row[2] !== undefined &&
@@ -358,16 +359,11 @@ export class SurveyUploader
           row[2] !== ""
         ) {
           response = row[2].toString().trim();
-        } else if (
-          row.length > 1 &&
-          row[1] !== undefined &&
-          row[1] !== null &&
-          row[1] !== ""
-        ) {
-          response = row[1].toString().trim();
         }
+        // If column 2 is empty, keep response as empty string (don't fall back)
 
-        // Notes could be in column 3 or 4 (index 2 or 3)
+        // Notes should be in column 3 (index 3)
+        // Do not fall back to response column or other columns
         if (
           row.length > 3 &&
           row[3] !== undefined &&
@@ -375,15 +371,8 @@ export class SurveyUploader
           row[3] !== ""
         ) {
           notes = row[3].toString().trim();
-        } else if (
-          row.length > 2 &&
-          row[2] !== undefined &&
-          row[2] !== null &&
-          row[2] !== "" &&
-          !response
-        ) {
-          notes = row[2].toString().trim();
         }
+        // If column 3 is empty, keep notes as empty string (don't fall back)
 
         // Only add if we have at least an ID
         if (id) {
@@ -765,26 +754,18 @@ export class SurveyUploader
       const existingRecord = retrieveResponse.entities[0];
       console.log(`Found existing record:`, existingRecord);
 
-      // Prepare update data
+      // Prepare update data - always set both fields to ensure blank responses clear existing data
       const updateData: any = {};
 
-      if (row.Response && row.Response.toString().trim() !== "") {
-        updateData.afsdc_response = row.Response.toString().trim();
-      }
+      // Set response field - use empty string if blank to clear existing data
+      updateData.afsdc_response = row.Response && row.Response.toString().trim() !== "" 
+        ? row.Response.toString().trim() 
+        : "";
 
-      if (row.Notes && row.Notes.toString().trim() !== "") {
-        updateData.afsdc_comments = row.Notes.toString().trim();
-      }
-
-      // Only update if we have data to update
-      if (Object.keys(updateData).length === 0) {
-        console.log(`No update data for record: ${cleanId}`);
-        return {
-          success: false,
-          recordId: row.ID,
-          error: "No data to update (Response and Notes are empty)",
-        };
-      }
+      // Set comments field - use empty string if blank to clear existing data
+      updateData.afsdc_comments = row.Notes && row.Notes.toString().trim() !== "" 
+        ? row.Notes.toString().trim() 
+        : "";
 
       console.log(
         `Updating record ${existingRecord.afsdc_questionresponseinstanceid} with:`,
