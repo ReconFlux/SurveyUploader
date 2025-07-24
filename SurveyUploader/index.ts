@@ -300,7 +300,18 @@ export class SurveyUploader
       await this.processDataverseUpdates();
     } catch (error) {
       console.error("Error processing file:", error);
-      this.updateModalStatus(`Error: ${error}`, "error");
+      
+      // Check for encryption-related errors
+      const errorMessage = error?.toString() || "";
+      if (errorMessage.includes("ECMA-376 Encrypted") || errorMessage.includes("EncryptionInfo")) {
+        this.updateModalStatus(
+          "Error: The Excel file is password-protected or encrypted. Please save the file without password protection and try again.",
+          "error"
+        );
+      } else {
+        this.updateModalStatus(`Error: ${error}`, "error");
+      }
+      
       this.showModalFooter();
     }
   }
